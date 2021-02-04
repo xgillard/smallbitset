@@ -3,7 +3,7 @@
 [![Documentation](https://img.shields.io/badge/Docs.rs-Latest-informational)](https://docs.rs/smallbitset/)
 [![Build](https://github.com/xgillard/smallbitset/workflows/Build/badge.svg)](https://github.com/xgillard/smallbitset/actions?query=workflow%3A%22Build%22)
 [![Tests](https://github.com/xgillard/smallbitset/workflows/Tests/badge.svg)](https://github.com/xgillard/smallbitset/actions?query=workflow%3A%22Tests%22)
-[![codecov](https://codecov.io/gh/xgillard/smallbitset/branch/master/graph/badge.svg)](https://codecov.io/gh/xgillard/smallbitset)
+[![codecov](https://codecov.io/gh/xgillard/smallbitset/branch/main/graph/badge.svg)](https://codecov.io/gh/xgillard/smallbitset)
 [![Quality](https://github.com/xgillard/smallbitset/workflows/Quality%20Assurance/badge.svg)](https://github.com/xgillard/smallbitset/actions?query=workflow%3A%22Quality+Assurance%22)
 ![GitHub](https://img.shields.io/github/license/xgillard/smallbitset)
 
