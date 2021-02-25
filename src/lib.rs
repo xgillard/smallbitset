@@ -124,6 +124,22 @@ macro_rules! small_set {
             }
         }
 
+        impl ::std::fmt::Display for $name {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                ::std::write!(f, "{{")?;
+                let mut it   = self.iter();
+                let mut next = it.next();
+                while let Some(v) = next {
+                    next = it.next();
+                    if next.is_some() {
+                        ::std::write!(f, "{}, ", v)?;
+                    } else {
+                        ::std::write!(f, "{}", v)?;
+                    }
+                }
+                ::std::write!(f, "}}")
+            }
+        }
 
         #[cfg(test)]
         mod $tests {
@@ -317,6 +333,23 @@ macro_rules! small_set {
             #[test]
             fn test_capacity() {
                 assert_eq!($name::empty().capacity(), $capa);
+            }
+
+
+            #[test]
+            fn test_display_empty(){
+                let set = $name::empty();
+                assert_eq!("{}", format!("{}", set));
+            }
+            #[test]
+            fn test_display_singleton(){
+                let set = $name::singleton(4);
+                assert_eq!("{4}", format!("{}", set));
+            }
+            #[test]
+            fn test_display_multi(){
+                let set = $name::singleton(1).insert(4).insert(6);
+                assert_eq!("{1, 4, 6}", format!("{}", set));
             }
         }
     }
