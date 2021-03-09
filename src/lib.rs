@@ -141,6 +141,17 @@ macro_rules! small_set {
             }
         }
 
+        impl From<$name> for $inner {
+            fn from(x: $name) -> $inner {
+                x.0
+            }
+        }
+        impl From<$inner> for $name {
+            fn from(x: $inner) -> $name {
+                $name(x)
+            }
+        }
+
         #[cfg(test)]
         mod $tests {
             use super::*;
