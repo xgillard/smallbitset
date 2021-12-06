@@ -29,7 +29,7 @@
 /// This macro generates an implementation for the desired types. It simply 
 /// avoid code duplication for structs that cannot otherwise be generic.
 macro_rules! small_set {
-    ($name:ident, $iter:ident, $inner:ty, $capa: literal, $tests:ident) => {
+    ($name:ident, $iter:ident, $inner:ty, $capa: expr, $tests:ident) => {
         /// This structure encapsulates a small allocation free set of integers.
         /// Because it is implemented as a fixed size bitset, it can only
         /// accomodate values in the range 0..$capa. 
@@ -373,5 +373,17 @@ small_set!(Set16,   Set16Iter,   u16,    16, test_16);
 small_set!(Set32,   Set32Iter,   u32,    32, test_32);
 small_set!(Set64,   Set64Iter,   u64,    64, test_64);
 small_set!(Set128,  Set128Iter,  u128,  128, test128);
-// This may be un commented once usize::BITS stabilizes
-//small_set!(SetSize, SetSizeIter, usize, usize::BITS, testsize);
+
+// A small bitset whose size is that of a processor word
+const USIZE_BITS: u8 = usize::BITS as u8;
+small_set!(SetSize, SetSizeIter, usize, USIZE_BITS, testsize);
+
+mod custom;
+pub use custom::*;
+
+pub type MutSet8   = BitSet<1>;
+pub type MutSet16  = BitSet<2>;
+pub type MutSet32  = BitSet<4>;
+pub type MutSet64  = BitSet<8>;
+pub type MutSet128 = BitSet<16>;
+pub type MutSet256 = BitSet<32>;
