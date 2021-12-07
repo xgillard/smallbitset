@@ -160,6 +160,7 @@ impl <const CAPA: usize> Display for BitSet<CAPA> {
     }
 }
 
+#[allow(clippy::just_underscores_and_digits)]
 #[cfg(test)]
 mod tests {
     use super::*;

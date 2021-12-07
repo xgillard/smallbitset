@@ -374,10 +374,6 @@ small_set!(Set32,   Set32Iter,   u32,    32, test_32);
 small_set!(Set64,   Set64Iter,   u64,    64, test_64);
 small_set!(Set128,  Set128Iter,  u128,  128, test128);
 
-// A small bitset whose size is that of a processor word
-const USIZE_BITS: u8 = usize::BITS as u8;
-small_set!(SetSize, SetSizeIter, usize, USIZE_BITS, testsize);
-
 mod custom;
 pub use custom::*;
 
