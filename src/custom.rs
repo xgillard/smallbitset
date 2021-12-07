@@ -3,9 +3,6 @@ use std::{slice::Iter, usize, ops::Not, fmt::Display};
 /// This structure encapsulates a small allocation free set of integers.
 /// Because it is implemented as a fixed size bitset, it can only
 /// accomodate values in the range 0..$capa/8. 
-///
-/// Because of this restriction on the range of allowed values, all the
-/// items that can be stored in this set are of type 'u8'. 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct BitSet<const CAPA: usize> {
     blocks: [u8; CAPA]
@@ -48,7 +45,7 @@ impl <const CAPA: usize> BitSet<CAPA> {
     }
     /// Complements (filp all bits of) the set
     pub fn complement(&mut self) {
-        self.blocks.iter_mut().for_each(|x| *x=!*x)
+        self.blocks.iter_mut().for_each(|x| *x = !*x)
     }
     /// Keeps the intersection of self and other
     pub fn inter(&mut self, other: &Self) {
