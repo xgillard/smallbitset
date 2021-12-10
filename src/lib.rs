@@ -377,9 +377,9 @@ small_set!(Set128,  Set128Iter,  u128,  128, test128);
 mod custom;
 pub use custom::*;
 
-pub type MutSet8   = BitSet<1>;
-pub type MutSet16  = BitSet<2>;
-pub type MutSet32  = BitSet<4>;
-pub type MutSet64  = BitSet<8>;
-pub type MutSet128 = BitSet<16>;
-pub type MutSet256 = BitSet<32>;
+pub type MutSet8   = BitSet<u8,     8, 1>;
+pub type MutSet16  = BitSet<u16,   16, 1>;
+pub type MutSet32  = BitSet<u32,   32, 1>;
+pub type MutSet64  = BitSet<u64,   64, 1>;
+pub type MutSet128 = BitSet<u128, 128, 1>;
+pub type MutSet256 = BitSet<u128, 256, 2>;

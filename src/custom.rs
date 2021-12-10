@@ -1,20 +1,28 @@
-use std::{slice::Iter, usize, ops::Not, fmt::Display};
+use std::{slice::Iter, usize, ops::{Not, BitAndAssign, BitOr, BitOrAssign, BitAnd, Shl, ShlAssign}, fmt::Display};
+
+use num::{PrimInt, Unsigned};
 
 /// This structure encapsulates a small allocation free set of integers.
 /// Because it is implemented as a fixed size bitset, it can only
 /// accomodate values in the range 0..$capa/8. 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub struct BitSet<const CAPA: usize> {
-    blocks: [u8; CAPA]
+pub struct BitSet<T, const BITS: usize, const BLOCKS: usize> 
+    where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
+{
+    blocks: [T; BLOCKS]
 }
-impl <const CAPA: usize> BitSet<CAPA> {
+impl <T, const BITS: usize, const BLOCKS: usize> BitSet<T, BITS, BLOCKS> 
+    where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
+{
     /// This method creates an empty set 
     pub fn empty() -> Self {
-        Self{blocks: [0_u8; CAPA]}
+        Self{blocks: [T::zero(); BLOCKS]}
     }
     /// This method returns the complete set
     pub fn all() -> Self {
-        Self{blocks: [255_u8; CAPA]}
+        let mut me = Self::empty();
+        me.complement();
+        me
     }
     /// This method creates a singleton set holding the single value 'x'.
     pub fn singleton(x: usize) -> Self {
@@ -24,23 +32,23 @@ impl <const CAPA: usize> BitSet<CAPA> {
     }
     /// Returns true iff the set contains item i
     pub fn contains(&self, i: usize) -> bool {
-        let block  = i/8;
-        let offset = i%8;
-        let mask   = 1_u8 << offset;
-        (self.blocks[block] & mask) > 0
+        let block  = i/Self::bits_per_block();
+        let offset = i%Self::bits_per_block();
+        let mask   = T::one() << offset;
+        (self.blocks[block] & mask) > T::zero()
     }
     /// Adds element i to the set
     pub fn add(&mut self, i: usize) {
-        let block  = i/8;
-        let offset = i%8;
-        let mask   = 1_u8 << offset;
+        let block  = i/Self::bits_per_block();
+        let offset = i%Self::bits_per_block();
+        let mask   = T::one() << offset;
         self.blocks[block] |= mask;
     }
     /// Removes element i from the set
     pub fn remove(&mut self, i: usize) {
-        let block  = i/8;
-        let offset = i%8;
-        let mask   = !(1_u8 << offset);
+        let block  = i/Self::bits_per_block();
+        let offset = i%Self::bits_per_block();
+        let mask   = !(T::one() << offset);
         self.blocks[block] &= mask;
     }
     /// Complements (filp all bits of) the set
@@ -51,7 +59,7 @@ impl <const CAPA: usize> BitSet<CAPA> {
     pub fn inter(&mut self, other: &Self) {
         self.blocks.iter_mut()
             .zip(other.blocks.iter())
-            .for_each(|(x, y)| *x&=y)
+            .for_each(|(x, y)| *x&=*y)
     }
     /// Keeps the union of self and other
     pub fn union(&mut self, other: &Self) {
@@ -75,7 +83,7 @@ impl <const CAPA: usize> BitSet<CAPA> {
     pub fn disjoint(&self, other: &Self) -> bool {
         self.blocks.iter().copied()
             .zip(other.blocks.iter().copied())
-            .all(|(x, y)| x&y == 0)
+            .all(|(x, y)| x&y == T::zero())
     }
     /// Returns true iff the intersects with other set
     pub fn intersect(&self, other: &Self) -> bool {
@@ -110,40 +118,60 @@ impl <const CAPA: usize> BitSet<CAPA> {
             .enumerate()
             .filter_map(|(i, x)| if !x {Some(i)} else {None})
     }
+    /// Returns the number of bits that can be contained in this bitset
+    pub fn capacity() -> usize {
+        BITS
+    }
+    #[inline]
+    fn bits_per_block() -> usize {
+        bits_per_block(BITS, BLOCKS)
+    }
+}
+
+const fn bits_per_block(bits: usize, blocks: usize) -> usize {
+    bits / blocks
 }
 
 #[derive(Debug, Clone)]
-pub struct BitIter<'a> {
-    blocks : Iter<'a, u8>,
-    current: Option<u8>,
-    bit    : u8,
+pub struct BitIter<'a, T> 
+    where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
+{
+    blocks : Iter<'a, T>,
+    current: Option<T>,
+    bit    : T,
     pos    : usize
 }
-impl <'a> BitIter<'a> {
-    pub fn new(blocks: Iter<'a, u8>) -> Self {
+impl <'a, T> BitIter<'a, T> 
+    where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
+{
+    pub fn new(blocks: Iter<'a, T>) -> Self {
         Self {
             blocks, 
             current: None,
-            bit    : 1_u8,
+            bit    : T::one(),
             pos    : 0
         }
     }
 }
-impl Iterator for BitIter<'_> {
+impl <T> Iterator for BitIter<'_, T> 
+    where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
+{
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos % 8 == 0 {
             self.current = self.blocks.next().copied();
-            self.bit     = 1_u8;
+            self.bit     = T::one();
         }
-        let res    = self.current.map(|i| (i & self.bit) > 0_u8 );
-        self.bit <<= 1;
+        let res    = self.current.map(|i| (i & self.bit) > T::zero() );
+        self.bit <<= T::one();
         self.pos  += 1;
         res
     }
 }
-impl <const CAPA: usize> Display for BitSet<CAPA> {
+impl <T, const BITS: usize, const BLOCKS: usize> Display for BitSet<T, BITS, BLOCKS> 
+    where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         ::std::write!(f, "{{")?;
         let mut it   = self.iter();
@@ -164,7 +192,7 @@ impl <const CAPA: usize> Display for BitSet<CAPA> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    type BitSet8 = BitSet::<1>;
+    type BitSet8 = BitSet::<u8, 8, 1>;
 
     // --- EMPTY SET -------------------------------------------------
     #[test]
