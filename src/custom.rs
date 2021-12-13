@@ -4,7 +4,7 @@ use num::{PrimInt, Unsigned};
 
 /// This structure encapsulates a small allocation free set of integers.
 /// Because it is implemented as a fixed size bitset, it can only
-/// accomodate values in the range 0..$capa/8. 
+/// accomodate values in the range 0..$BITS. 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct BitSet<T, const BITS: usize, const BLOCKS: usize> 
     where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
@@ -104,7 +104,7 @@ impl <T, const BITS: usize, const BLOCKS: usize> BitSet<T, BITS, BLOCKS>
      }
     /// Iterates over the bits of the set
     pub fn bits(&self) -> impl Iterator<Item=bool> + '_ {
-        BitIter::new(self.blocks.iter())
+        BitIter::<T, BITS, BLOCKS>::new(self.blocks.iter())
     }
     /// Iterates over the ones in the set
     pub fn ones(&self) -> impl Iterator<Item=usize> + '_ {
@@ -133,7 +133,7 @@ const fn bits_per_block(bits: usize, blocks: usize) -> usize {
 }
 
 #[derive(Debug, Clone)]
-pub struct BitIter<'a, T> 
+pub struct BitIter<'a, T, const BITS: usize, const BLOCKS: usize> 
     where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
 {
     blocks : Iter<'a, T>,
@@ -141,7 +141,7 @@ pub struct BitIter<'a, T>
     bit    : T,
     pos    : usize
 }
-impl <'a, T> BitIter<'a, T> 
+impl <'a, T, const BITS: usize, const BLOCKS: usize> BitIter<'a, T, BITS, BLOCKS> 
     where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
 {
     pub fn new(blocks: Iter<'a, T>) -> Self {
@@ -153,13 +153,13 @@ impl <'a, T> BitIter<'a, T>
         }
     }
 }
-impl <T> Iterator for BitIter<'_, T> 
+impl <T, const BITS: usize, const BLOCKS: usize> Iterator for BitIter<'_, T, BITS, BLOCKS> 
     where T: PrimInt + Unsigned + BitAnd + BitAndAssign + BitOr + BitOrAssign + Shl + ShlAssign
 {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.pos % 8 == 0 {
+        if self.pos % bits_per_block(BITS, BLOCKS) == 0 {
             self.current = self.blocks.next().copied();
             self.bit     = T::one();
         }
@@ -190,96 +190,96 @@ impl <T, const BITS: usize, const BLOCKS: usize> Display for BitSet<T, BITS, BLO
 
 #[allow(clippy::just_underscores_and_digits)]
 #[cfg(test)]
-mod tests {
+mod tests_one_block {
     use super::*;
-    type BitSet8 = BitSet::<u8, 8, 1>;
+    type MutBitSet = BitSet::<u8, 8, 1>;
 
     // --- EMPTY SET -------------------------------------------------
     #[test]
     fn emptyset_is_empty() {
-        let x = BitSet8::empty();
+        let x = MutBitSet::empty();
         assert!(x.is_empty());
     }
     #[test]
     fn emptyset_len() {
-        let x = BitSet8::empty();
+        let x = MutBitSet::empty();
         assert_eq!(0, x.len());
     }
     #[test]
     fn emptyset_iter_count(){
-        let x = BitSet8::empty();
+        let x = MutBitSet::empty();
         assert_eq!(0, x.iter().count());
     }
     #[test]
     fn emptyset_contains_no_item() {
-        let x = BitSet8::empty();
-        for i in 0..8{
+        let x = MutBitSet::empty();
+        for i in 0..MutBitSet::capacity() {
             assert!(!x.contains(i));
         }
     }
     #[test]
     fn emptyset_complement() {
-        let mut bs1 = BitSet8::empty();
+        let mut bs1 = MutBitSet::empty();
         bs1.complement();
-        assert_eq!(bs1, BitSet8::all());
+        assert_eq!(bs1, MutBitSet::all());
 
         bs1.complement();
-        assert_eq!(bs1, BitSet8::empty());
+        assert_eq!(bs1, MutBitSet::empty());
     }
 
     // --- FULL SET --------------------------------------------------
     #[test]
     fn fullset_is_not_empty() {
-        let x = BitSet8::all();
+        let x = MutBitSet::all();
         assert!(!x.is_empty());
     }
     #[test]
     fn fullset_len() {
-        let x = BitSet8::all();
-        assert_eq!(8, x.len());
+        let x = MutBitSet::all();
+        assert_eq!(MutBitSet::capacity(), x.len());
     }
     #[test]
     fn fullset_iter_count(){
-        let x = BitSet8::all();
-        assert_eq!(8, x.iter().count());
+        let x = MutBitSet::all();
+        assert_eq!(MutBitSet::capacity(), x.iter().count());
     }
     #[test]
     fn fullset_contains_all_items() {
-        let x = BitSet8::all();
-        for i in 0..8 {
+        let x = MutBitSet::all();
+        for i in 0..MutBitSet::capacity() {
             assert!(x.contains(i));
         }
     }
     #[test]
     fn fullset_complement() {
-        let mut bs = BitSet8::all();
+        let mut bs = MutBitSet::all();
         bs.complement();
-        assert_eq!(bs, BitSet8::empty());
+        assert_eq!(bs, MutBitSet::empty());
 
         bs.complement();
-        assert_eq!(bs, BitSet8::all());
+        assert_eq!(bs, MutBitSet::all());
     }
     
     // --- SINGLETON --------------------------------------------------
     #[test]
     fn singleton_is_not_empty() {
-        let x = BitSet8::singleton(0);
+        let x = MutBitSet::singleton(0);
         assert!(!x.is_empty());
     }
     #[test]
     fn singleton_len() {
-        let x = BitSet8::singleton(1);
+        let x = MutBitSet::singleton(1);
         assert_eq!(1, x.len());
     }
     #[test]
     fn singleton_iter_count(){
-        let x = BitSet8::singleton(2);
+        let x = MutBitSet::singleton(2);
         assert_eq!(1, x.iter().count());
     }
     #[test]
     fn singleton_contains_one_single_item() {
-        let x = BitSet8::singleton(3);
-        for i in 0..8 {
+        let x = MutBitSet::singleton(3);
+        for i in 0..MutBitSet::capacity() {
             if i == 3 {
                 assert!(x.contains(i));
             } else {
@@ -289,18 +289,18 @@ mod tests {
     }
     #[test]
     fn singleton_complement() {
-        let mut x = BitSet8::singleton(4);
+        let mut x = MutBitSet::singleton(4);
         x.complement();
         x.complement();
-        assert_eq!(x, BitSet8::singleton(4));
+        assert_eq!(x, MutBitSet::singleton(4));
     }
 
     // --- OTHER METHODS ---------------------------------------------
     #[test]
     fn test_union() {
-        let mut _124   = BitSet8::empty();
-        let mut _035   = BitSet8::empty();
-        let mut _01235 = BitSet8::empty();
+        let mut _124   = MutBitSet::empty();
+        let mut _035   = MutBitSet::empty();
+        let mut _01235 = MutBitSet::empty();
 
         _124.add(1);
         _124.add(2);
@@ -325,8 +325,8 @@ mod tests {
 
     #[test]
     fn test_inter() {
-        let mut _124   = BitSet8::empty();
-        let mut _025   = BitSet8::empty();
+        let mut _124   = MutBitSet::empty();
+        let mut _025   = MutBitSet::empty();
 
         _124.add(1);
         _124.add(2);
@@ -339,22 +339,22 @@ mod tests {
         let mut inter = _124;
         inter.inter(&_025);
 
-        assert_eq!(BitSet8::singleton(2), inter);
+        assert_eq!(MutBitSet::singleton(2), inter);
     }
     #[test]
     fn diff_removes_existing_item() {
-        let mut _02 = BitSet8::singleton(0);
+        let mut _02 = MutBitSet::singleton(0);
         _02.add(2);
 
         let mut diff = _02;
-        diff.diff(&BitSet8::singleton(2));
+        diff.diff(&MutBitSet::singleton(2));
 
-        assert_eq!(BitSet8::singleton(0), diff);
+        assert_eq!(MutBitSet::singleton(0), diff);
     }
     #[test]
     fn diff_removes_all_existing_item() {
-        let mut _02  = BitSet8::singleton(0);
-        let mut delta= BitSet8::singleton(0);
+        let mut _02  = MutBitSet::singleton(0);
+        let mut delta= MutBitSet::singleton(0);
 
         _02.add(2);
         delta.add(2);
@@ -362,12 +362,12 @@ mod tests {
         let mut empty = _02;
         empty.diff(&delta);
         
-        assert_eq!(BitSet8::empty(), empty);
+        assert_eq!(MutBitSet::empty(), empty);
     }
     #[test]
     fn diff_leaves_non_existing_items() {
-        let mut _02  = BitSet8::singleton(0);
-        let mut delta= BitSet8::singleton(0);
+        let mut _02  = MutBitSet::singleton(0);
+        let mut delta= MutBitSet::singleton(0);
 
         _02.add(2);
         delta.add(6);
@@ -375,11 +375,11 @@ mod tests {
         let mut diff = _02;
         diff.diff(&delta);
         
-        assert_eq!(BitSet8::singleton(2), diff);
+        assert_eq!(MutBitSet::singleton(2), diff);
     }
     #[test]
     fn insert_contains() {
-        let mut x = BitSet8::empty();
+        let mut x = MutBitSet::empty();
         assert!(!x.contains(1));
         assert!(!x.contains(2));
         x.add(1);
@@ -394,7 +394,7 @@ mod tests {
     }
     #[test]
     fn remove_contains() {
-        let mut x = BitSet8::singleton(4);
+        let mut x = MutBitSet::singleton(4);
         assert!(!x.contains(1));
         assert!(!x.contains(2));
         assert!(x.contains(4));
@@ -419,7 +419,7 @@ mod tests {
     }
     #[test]
     fn test_iter() {
-        let mut x = BitSet8::singleton(1);
+        let mut x = MutBitSet::singleton(1);
         x.add(2);
         x.add(3);
 
@@ -428,7 +428,7 @@ mod tests {
     }
     #[test]
     fn test_into_iter() {
-        let mut x = BitSet8::singleton(1);
+        let mut x = MutBitSet::singleton(1);
         x.add(2);
         x.add(3);
 
@@ -441,19 +441,312 @@ mod tests {
 
     #[test]
     fn test_display_empty(){
-        let set = BitSet8::empty();
+        let set = MutBitSet::empty();
         assert_eq!("{}", format!("{}", set));
     }
     #[test]
     fn test_display_singleton(){
-        let set = BitSet8::singleton(4);
+        let set = MutBitSet::singleton(4);
         assert_eq!("{4}", format!("{}", set));
     }
     #[test]
     fn test_display_multi(){
-        let mut set = BitSet8::singleton(1);
+        let mut set = MutBitSet::singleton(1);
         set.add(4);
         set.add(6);
         assert_eq!("{1, 4, 6}", format!("{}", set));
+    }
+}
+
+#[allow(clippy::just_underscores_and_digits)]
+#[cfg(test)]
+mod tests_multiple_blocks {
+    use super::*;
+    type MutBitSet = BitSet::<u128, 256, 2>;
+
+    // --- EMPTY SET -------------------------------------------------
+    #[test]
+    fn emptyset_is_empty() {
+        let x = MutBitSet::empty();
+        assert!(x.is_empty());
+    }
+    #[test]
+    fn emptyset_len() {
+        let x = MutBitSet::empty();
+        assert_eq!(0, x.len());
+    }
+    #[test]
+    fn emptyset_iter_count(){
+        let x = MutBitSet::empty();
+        assert_eq!(0, x.iter().count());
+    }
+    #[test]
+    fn emptyset_contains_no_item() {
+        let x = MutBitSet::empty();
+        for i in 0..MutBitSet::capacity() {
+            assert!(!x.contains(i));
+        }
+    }
+    #[test]
+    fn emptyset_complement() {
+        let mut bs1 = MutBitSet::empty();
+        bs1.complement();
+        assert_eq!(bs1, MutBitSet::all());
+
+        bs1.complement();
+        assert_eq!(bs1, MutBitSet::empty());
+    }
+
+    // --- FULL SET --------------------------------------------------
+    #[test]
+    fn fullset_is_not_empty() {
+        let x = MutBitSet::all();
+        assert!(!x.is_empty());
+    }
+    #[test]
+    fn fullset_len() {
+        let x = MutBitSet::all();
+        assert_eq!(MutBitSet::capacity(), x.len());
+    }
+    #[test]
+    fn fullset_iter_count(){
+        let x = MutBitSet::all();
+        assert_eq!(MutBitSet::capacity(), x.iter().count());
+    }
+    #[test]
+    fn fullset_contains_all_items() {
+        let x = MutBitSet::all();
+        for i in 0..MutBitSet::capacity() {
+            assert!(x.contains(i));
+        }
+    }
+    #[test]
+    fn fullset_complement() {
+        let mut bs = MutBitSet::all();
+        bs.complement();
+        assert_eq!(bs, MutBitSet::empty());
+
+        bs.complement();
+        assert_eq!(bs, MutBitSet::all());
+    }
+    
+    // --- SINGLETON --------------------------------------------------
+    #[test]
+    fn singleton_is_not_empty() {
+        let x = MutBitSet::singleton(0);
+        assert!(!x.is_empty());
+    }
+    #[test]
+    fn singleton_len() {
+        let x = MutBitSet::singleton(1);
+        assert_eq!(1, x.len());
+    }
+    #[test]
+    fn singleton_iter_count(){
+        let x = MutBitSet::singleton(2);
+        assert_eq!(1, x.iter().count());
+    }
+    #[test]
+    fn singleton_contains_one_single_item() {
+        let x = MutBitSet::singleton(3);
+        for i in 0..MutBitSet::capacity() {
+            if i == 3 {
+                assert!(x.contains(i));
+            } else {
+                assert!(!x.contains(i));
+            }
+        }
+    }
+    #[test]
+    fn singleton_complement() {
+        let mut x = MutBitSet::singleton(4);
+        x.complement();
+        x.complement();
+        assert_eq!(x, MutBitSet::singleton(4));
+    }
+
+    // --- OTHER METHODS ---------------------------------------------
+    #[test]
+    fn test_union() {
+        let mut _124_127  = MutBitSet::empty();
+        let mut _035_254  = MutBitSet::empty();
+        let mut _01235_127_254 = MutBitSet::empty();
+
+        _124_127.add(1);
+        _124_127.add(2);
+        _124_127.add(4);
+        _124_127.add(127);
+
+        _035_254.add(0);
+        _035_254.add(3);
+        _035_254.add(5);
+        _035_254.add(254);
+
+        _01235_127_254.add(0);
+        _01235_127_254.add(1);
+        _01235_127_254.add(2);
+        _01235_127_254.add(3);
+        _01235_127_254.add(4);
+        _01235_127_254.add(5);
+        _01235_127_254.add(127);
+        _01235_127_254.add(254);
+
+        let mut union = _124_127;
+        union.union(&_035_254);
+
+        assert_eq!(_01235_127_254, union);
+    }
+
+    #[test]
+    fn test_inter() {
+        let mut _124_127  = MutBitSet::empty();
+        let mut _025_254  = MutBitSet::empty();
+
+        _124_127.add(1);
+        _124_127.add(2);
+        _124_127.add(4);
+        _124_127.add(127);
+
+        _025_254.add(0);
+        _025_254.add(2);
+        _025_254.add(5);
+        _025_254.add(254);
+
+        let mut inter = _124_127;
+        inter.inter(&_025_254);
+
+        assert_eq!(MutBitSet::singleton(2), inter);
+    }
+    #[test]
+    fn diff_removes_existing_item() {
+        let mut _234 = MutBitSet::singleton(0);
+        _234.add(234);
+
+        let mut diff = _234;
+        diff.diff(&MutBitSet::singleton(234));
+
+        assert_eq!(MutBitSet::singleton(0), diff);
+    }
+    #[test]
+    fn diff_removes_all_existing_item() {
+        let mut _135  = MutBitSet::singleton(135);
+        let mut delta= MutBitSet::singleton(0);
+
+        _135.add(135);
+        delta.add(135);
+
+        let mut empty = _135;
+        empty.diff(&delta);
+        
+        assert_eq!(MutBitSet::empty(), empty);
+    }
+    #[test]
+    fn diff_leaves_non_existing_items() {
+        let mut _135  = MutBitSet::singleton(135);
+        let mut delta= MutBitSet::singleton(135);
+
+        _135.add(2);
+        delta.add(6);
+
+        let mut diff = _135;
+        diff.diff(&delta);
+        
+        assert_eq!(MutBitSet::singleton(2), diff);
+    }
+    #[test]
+    fn insert_contains() {
+        let mut x = MutBitSet::empty();
+        assert!(!x.contains(1));
+        assert!(!x.contains(2));
+        x.add(1);
+
+        assert!(x.contains(1));
+        assert!(!x.contains(2));
+        
+        // duplicate add has no effect
+        x.add(1);
+        assert!(x.contains(1));
+        assert!(!x.contains(2));
+
+        // insertion in next block
+        assert!(!x.contains(155));
+        x.add(155);
+        assert!(x.contains(155));
+    }
+    #[test]
+    fn remove_contains() {
+        let mut x = MutBitSet::singleton(4);
+        assert!(!x.contains(1));
+        assert!(!x.contains(2));
+        assert!(x.contains(4));
+
+        // removing non existing has no effect
+        x.remove(1);
+        assert!(!x.contains(1));
+        assert!(!x.contains(2));
+        assert!(x.contains(4));
+        
+        // removing existing
+        x.remove(4);
+        assert!(!x.contains(1));
+        assert!(!x.contains(2));
+        assert!(!x.contains(4));
+        
+        // duplicate remove has no effect
+        x.remove(4);
+        assert!(!x.contains(1));
+        assert!(!x.contains(2));
+        assert!(!x.contains(4));
+
+        // in next block
+        x.add(155);
+        assert!(x.contains(155));
+        
+        x.remove(155);
+        assert!(!x.contains(155));
+        x.remove(155);
+        assert!(!x.contains(155));
+    }
+    #[test]
+    fn test_iter() {
+        let mut x = MutBitSet::singleton(1);
+        x.add(2);
+        x.add(3);
+        x.add(254);
+
+        let v = x.ones().collect::<Vec<_>>();
+        assert_eq!(vec![1, 2, 3, 254], v);
+    }
+    #[test]
+    fn test_into_iter() {
+        let mut x = MutBitSet::singleton(1);
+        x.add(2);
+        x.add(3);
+        x.add(254);
+
+        let mut v = vec![];
+        for i in x.ones() {
+            v.push(i);
+        }
+        assert_eq!(vec![1, 2, 3, 254], v);
+    }
+
+    #[test]
+    fn test_display_empty(){
+        let set = MutBitSet::empty();
+        assert_eq!("{}", format!("{}", set));
+    }
+    #[test]
+    fn test_display_singleton(){
+        let set = MutBitSet::singleton(154);
+        assert_eq!("{154}", format!("{}", set));
+    }
+    #[test]
+    fn test_display_multi(){
+        let mut set = MutBitSet::singleton(1);
+        set.add(4);
+        set.add(6);
+        set.add(228);
+        assert_eq!("{1, 4, 6, 228}", format!("{}", set));
     }
 }
