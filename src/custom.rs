@@ -750,3 +750,314 @@ mod tests_multiple_blocks {
         assert_eq!("{1, 4, 6, 228}", format!("{}", set));
     }
 }
+
+
+#[cfg(test)]
+mod additional_tests {
+    use crate::BitSet;
+
+    type MutBitSet = BitSet<u128, 256, 2>;
+
+    #[test]
+    fn fullset_contains_all_empty() {
+        let x = MutBitSet::all();
+        let y = MutBitSet::empty();
+
+        assert!(x.contains_all(&y));
+    }
+    #[test]
+    fn fullset_contains_all_fullset() {
+        let x = MutBitSet::all();
+        let y = MutBitSet::all();
+
+        assert!(x.contains_all(&y));
+    }
+    #[test]
+    fn fullset_contains_all_singleton() {
+        let x = MutBitSet::all();
+        
+        let y = MutBitSet::singleton(0);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(10);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(100);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(127);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(128);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(234);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(255);
+        assert!(x.contains_all(&y));
+    }
+
+    #[test]
+    fn fullset_contains_all() {
+        let x = MutBitSet::all();
+        let mut y = MutBitSet::singleton(0);
+        y.add(10);
+        y.add(20);
+        y.add(100);
+        y.add(127);
+        y.add(128);
+        y.add(234);
+        y.add(255);
+
+        assert!(x.contains_all(&y));
+    }
+
+    #[test]
+    fn emptyset_contains_all_empty() {
+        let x = MutBitSet::empty();
+        let y = MutBitSet::empty();
+
+        assert!(x.contains_all(&y));
+    }
+    #[test]
+    fn emptyset_contains_all_fullset() {
+        let x = MutBitSet::empty();
+        let y = MutBitSet::all();
+
+        assert!(!x.contains_all(&y));
+    }
+    #[test]
+    fn emptyset_contains_all_singleton() {
+        let x = MutBitSet::empty();
+        
+        let y = MutBitSet::singleton(0);
+        assert!(!x.contains_all(&y));
+
+        let y = MutBitSet::singleton(10);
+        assert!(!x.contains_all(&y));
+
+        let y = MutBitSet::singleton(100);
+        assert!(!x.contains_all(&y));
+
+        let y = MutBitSet::singleton(127);
+        assert!(!x.contains_all(&y));
+
+        let y = MutBitSet::singleton(128);
+        assert!(!x.contains_all(&y));
+
+        let y = MutBitSet::singleton(234);
+        assert!(!x.contains_all(&y));
+
+        let y = MutBitSet::singleton(255);
+        assert!(!x.contains_all(&y));
+    }
+
+    #[test]
+    fn emptyset_contains_all() {
+        let x = MutBitSet::empty();
+        let mut y = MutBitSet::singleton(0);
+        y.add(10);
+        y.add(20);
+        y.add(100);
+        y.add(127);
+        y.add(128);
+        y.add(234);
+        y.add(255);
+
+        assert!(!x.contains_all(&y));
+    }
+
+    #[test]
+    fn contains_all_empty() {
+        let mut x = MutBitSet::empty();
+        x.add(10);
+        x.add(20);
+        x.add(100);
+        x.add(127);
+        x.add(128);
+        x.add(234);
+        x.add(255);
+
+        let y = MutBitSet::empty();
+        assert!(x.contains_all(&y));
+    }
+    #[test]
+    fn contains_all_fullset() {
+        let mut x = MutBitSet::empty();
+        x.add(10);
+        x.add(20);
+        x.add(100);
+        x.add(127);
+        x.add(128);
+        x.add(234);
+        x.add(255);
+
+        let y = MutBitSet::all();
+        assert!(!x.contains_all(&y));
+    }
+    #[test]
+    fn contains_all_singleton() {
+        let mut x = MutBitSet::empty();
+        x.add(10);
+        x.add(20);
+        x.add(100);
+        x.add(127);
+        x.add(128);
+        x.add(234);
+        x.add(255);
+
+        
+        let y = MutBitSet::singleton(0);
+        assert!(!x.contains_all(&y));
+
+        let y = MutBitSet::singleton(10);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(100);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(127);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(128);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(234);
+        assert!(x.contains_all(&y));
+
+        let y = MutBitSet::singleton(255);
+        assert!(x.contains_all(&y));
+    }
+
+    #[test]
+    fn contains_all() {
+        let mut x = MutBitSet::empty();
+        x.add(10);
+        x.add(20);
+        x.add(100);
+        x.add(127);
+        x.add(128);
+        x.add(234);
+        x.add(255);
+
+        let mut y = MutBitSet::empty();
+        y.add(10);
+        y.add(20);
+        y.add(100);
+        y.add(127);
+        y.add(128);
+        y.add(234);
+        y.add(255);
+
+        assert!(x.contains_all(&y));
+    }
+    #[test]
+    fn contains_all_partial_overlap() {
+        let mut x = MutBitSet::empty();
+        x.add(10);
+        x.add(20);
+        x.add(255);
+
+        let mut y = MutBitSet::singleton(0);
+        y.add(10);
+        y.add(20);
+        y.add(100);
+        y.add(127);
+        y.add(128);
+        y.add(234);
+        y.add(255);
+
+        assert!(!x.contains_all(&y));
+    }
+
+    #[test]
+    fn emptyset_disjoint_from_fullset() {
+        let x = MutBitSet::empty();
+        let y = MutBitSet::all();
+        assert!(x.disjoint(&y));
+    }
+    #[test]
+    fn fullset_disjoint_from_emptyset() {
+        let x = MutBitSet::empty();
+        let y = MutBitSet::all();
+        assert!(y.disjoint(&x));
+    }
+    #[test]
+    fn set_disjoint_from_complement() {
+        let x = MutBitSet::singleton(10);
+        let mut y = x;
+        y.complement();
+        assert!(x.disjoint(&y));
+    }
+    #[test]
+    fn disjoint_if_disjoint() {
+        let x = MutBitSet::singleton(10);
+        let y = MutBitSet::singleton(254);
+        assert!(x.disjoint(&y));
+    }
+    #[test]
+    fn not_disjoint_if_partial_overlap() {
+        let mut x = MutBitSet::singleton(10);
+        x.add(0);
+        let mut y = MutBitSet::singleton(254);
+        y.add(0);
+        assert!(!x.disjoint(&y));
+    }
+
+    #[test]
+    fn emptyset_does_not_intersect_fullset() {
+        let x = MutBitSet::empty();
+        let y = MutBitSet::all();
+        assert!(!x.intersect(&y));
+    }
+    #[test]
+    fn fullset_does_not_intersect_emptyset() {
+        let x = MutBitSet::empty();
+        let y = MutBitSet::all();
+        assert!(!y.intersect(&x));
+    }
+    #[test]
+    fn set_does_not_intersect_complement() {
+        let x = MutBitSet::singleton(10);
+        let mut y = x;
+        y.complement();
+        assert!(!x.intersect(&y));
+    }
+    #[test]
+    fn do_not_intersect_if_disjoint() {
+        let x = MutBitSet::singleton(10);
+        let y = MutBitSet::singleton(254);
+        assert!(!x.intersect(&y));
+    }
+    #[test]
+    fn intersect_if_partial_overlap() {
+        let mut x = MutBitSet::singleton(10);
+        x.add(0);
+        let mut y = MutBitSet::singleton(254);
+        y.add(0);
+        assert!(x.intersect(&y));
+    }
+    #[test]
+    fn intersect_self() {
+        let x = MutBitSet::singleton(10);
+        assert!(x.intersect(&x));
+    }
+
+    // zeroes
+    #[test]
+    fn no_zeroes_in_fullset() {
+        let x = MutBitSet::all();
+        assert_eq!(0, x.zeroes().count());
+    }
+    #[test]
+    fn all_zeroes_in_emptyset() {
+        let x = MutBitSet::empty();
+        assert_eq!(MutBitSet::capacity(), x.zeroes().count());
+    }
+    #[test]
+    fn almost_all_zeroes_in_sinleton() {
+        let x = MutBitSet::singleton(129);
+        assert_eq!(MutBitSet::capacity()-1, x.zeroes().count());
+    }
+}
