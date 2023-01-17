@@ -12,5 +12,5 @@ categories  = ["data-structures", "mathematics"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-num   = "0.4.0"
+num   = "0.4"
 paste = "1.0"

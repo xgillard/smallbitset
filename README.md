@@ -16,7 +16,7 @@ section.
 
 ```toml
 [dependencies]
-smallbitset = "0.1.0"
+smallbitset = "0.6.0"
 ```
 
 Then in your main code, you will simply use one of the available collections 

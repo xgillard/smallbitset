@@ -143,7 +143,7 @@ macro_rules! bitset {
                 self
             }
             /// Updates this set so that it contains the negation of self
-            pub fn flip_inplace(mut self) -> Self {
+            pub fn flip_inplace(&mut self) -> &mut Self {
                 for block in self.blocks.iter_mut() {
                     *block = !*block;
                 }
@@ -340,8 +340,162 @@ macro_rules! bitset {
                 found
             }
         }
+    };
+}
 
+/// This structure is really only meant to facilitate the writing
+/// of iterator methods on bitsets. This way, only the const param
+/// can be specified while leaving all the other types inferred by 
+/// the compiler. (That's kind of type curry-ing).
+#[derive(Debug, Clone, Copy)]
+pub struct BitsBuilder<const BITS: u32>;
+impl <const BITS: u32> BitsBuilder<BITS> {
+    /// Creates a new iterator over the bits of the given blocks
+    pub fn build<T, I>(iter: I) -> Bits<BITS, T, I> 
+    where T: PrimInt + Unsigned + Shl + ShlAssign, 
+          I: Iterator<Item = T>
+    {
+        Bits::new(iter)
+    }
+}
 
+/// This iterator goes over all the bits whose value are 1 in a biset
+#[derive(Debug, Clone)]
+pub struct Bits<const BITS: u32, T, I> 
+where T: PrimInt + Unsigned + Shl + ShlAssign, 
+      I: Iterator<Item = T>
+{
+    /// The current block
+    head: Option<T>,
+    /// The rest of the blocks that haven't been touched yet
+    tail: I,
+    /// The portion of the value of the next item dependent 
+    /// of the position of the current block
+    base: u32,
+    /// The offset of the next tested item in its block
+    offset : u32, 
+    /// The number of items that remain to cover in the current block
+    /// 
+    /// # Note
+    /// This seemed like a smart thing to do since the LLVM assembly
+    /// has a decicated primitive 'ctpop' whose sole purpose is to 
+    /// count the on bits in an integer value.
+    rem : u32,
+    /// A mask that targets the test of the next bit in the current block
+    mask: T,
+}
+impl <const BITS: u32, T, I> Bits<BITS, T, I>
+where T: PrimInt + Unsigned + Shl + ShlAssign, 
+      I: Iterator<Item = T>
+{
+    /// Create a new iterator on the bits present in the integer blocks
+    /// that are iterated over by 'it'.
+    pub fn new(mut it: I) -> Self {
+        let head = it.next();
+        let tail = it;
+        let mask = T::one();
+        let base = 0;
+        let offset = 0;
+        let rem = if let Some(x) = head { x.count_ones() } else { 0 };
+
+        Self { head, tail, base, offset, rem, mask }
+    }
+}
+impl <const BITS: u32, T, I> Iterator for Bits<BITS, T, I>
+where T: PrimInt + Unsigned + Shl + ShlAssign, 
+      I: Iterator<Item = T>
+{
+    type Item = usize;
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (_, tail_ub) = self.tail.size_hint();
+        let lb = self.rem as usize;
+        let ub = tail_ub.map(|x| x * BITS as usize + lb);
+
+        (lb, ub)
+    }
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.head.is_some() {
+            if self.rem == 0 {
+                self.head   = self.tail.next();
+                self.mask   = T::one();
+                self.base  += BITS;
+                self.offset = 0;
+                self.rem    = if let Some(x) = self.head { x.count_ones() } else { 0 }; 
+            } else {
+                break;
+            }
+        }
+        //
+        if let Some(x) = self.head {
+            // we can be sure that x is a non empty block
+            while (x & self.mask).is_zero() {
+                self.offset += 1;
+                self.mask  <<= T::one();
+            }
+            
+            // this is the result of our computation
+            let result = self.base + self.offset;
+            
+            // move to next bit
+            self.rem -= 1;
+            self.offset += 1;
+            self.mask  <<= T::one();
+            
+            Some(result as usize)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+/// This is an iterator that will iterate over all the subsets of a given size
+/// of a given bitset
+pub struct SubsetsOfSize<T> {
+    /// the current value of the bitset considered as a large integer
+    pub current: T,
+    /// the size of the subsets we want to enumerate
+    pub of_size: usize,
+    /// the number of subsets we have counted already
+    pub counted: usize,
+    /// the maximum number of such sets that can be generated
+    pub max_count: usize,
+    /// a mapping between the original values and those in the smaller subset which
+    /// is being used to generate values during iteration
+    pub mapping: Vec<usize>
+}
+
+/// This will count the number of possible cases. Given that we want to 
+/// draw k items among a set of n, without considering the repetitions
+/// and without considerations for the order, we are computing the number
+/// of possible combinations $C^n_k = \frac{n!}{k! (n-k)!}$. 
+pub fn nb_combinations(k: usize, among_n: usize) -> usize {
+    if k == among_n { 
+        1 
+    } else {
+        let mut num  = 1;
+        let mut denom = 1;
+
+        for i in 1..=k {
+            denom *= i;
+            num   *= among_n - (i - 1);
+        }
+
+        num / denom
+    }
+}
+
+bitset!(Set8,     8,   8, u8);
+bitset!(Set16,   16,  16, u16);
+bitset!(Set32,   32,  32, u32);
+bitset!(Set64,   64,  64, u64);
+bitset!(Set128, 128, 128, u128);
+bitset!(Set256, 256, 128, u128);
+
+macro_rules! test {
+    ($name: ident, $capa: expr) => {
         paste::paste! {
             #[cfg(test)]
             mod [<test_ $name:snake:lower>] {
@@ -393,8 +547,8 @@ macro_rules! bitset {
                 }
                 #[test]
                 fn emptyset_flip_inplace() {
-                    assert_eq!($name::empty().flip_inplace(), $name::full());
-                    assert_eq!($name::empty().flip_inplace().flip_inplace(), $name::empty());
+                    assert_eq!($name::empty().flip_inplace(), &$name::full());
+                    assert_eq!($name::empty().flip_inplace().flip_inplace(), &$name::empty());
                 }
                 #[test]
                 fn emptyset_not() {
@@ -442,8 +596,8 @@ macro_rules! bitset {
                 }
                 #[test]
                 fn fullset_flip_inplace() {
-                    assert_eq!($name::full().flip_inplace(), $name::empty());
-                    assert_eq!($name::full().flip_inplace().flip_inplace(), $name::full());
+                    assert_eq!($name::full().flip_inplace(), &$name::empty());
+                    assert_eq!($name::full().flip_inplace().flip_inplace(), &$name::full());
                 }
                 #[test]
                 fn fullset_not() {
@@ -495,8 +649,9 @@ macro_rules! bitset {
                 }
                 #[test]
                 fn singleton_flip_inplace() {
-                    let x = $name::singleton(4);
-                    assert_eq!(x.flip_inplace().flip_inplace(), x);
+                    let mut x = $name::singleton(4);
+                    let y = x;
+                    assert_eq!(x.flip_inplace().flip_inplace(), &y);
                 }
                 #[test]
                 fn singleton_not() {
@@ -932,22 +1087,22 @@ macro_rules! bitset {
                     let y = $name::singleton(0);
                     assert!(x.contains_all(y));
 
-                    let y = $name::singleton(10);
+                    let y = $name::singleton(2);
                     assert!(x.contains_all(y));
 
-                    let y = $name::singleton(100);
+                    let y = $name::singleton(3);
                     assert!(x.contains_all(y));
 
-                    let y = $name::singleton(127);
+                    let y = $name::singleton(4);
                     assert!(x.contains_all(y));
 
-                    let y = $name::singleton(128);
+                    let y = $name::singleton(5);
                     assert!(x.contains_all(y));
 
-                    let y = $name::singleton(234);
+                    let y = $name::singleton(6);
                     assert!(x.contains_all(y));
 
-                    let y = $name::singleton(255);
+                    let y = $name::singleton(7);
                     assert!(x.contains_all(y));
                 }
 
@@ -955,13 +1110,13 @@ macro_rules! bitset {
                 fn fullset_contains_all() {
                     let x = $name::full();
                     let mut y = $name::singleton(0);
-                    y.add_inplace(10);
-                    y.add_inplace(20);
-                    y.add_inplace(100);
-                    y.add_inplace(127);
-                    y.add_inplace(128);
-                    y.add_inplace(234);
-                    y.add_inplace(255);
+                    y.add_inplace(1);
+                    y.add_inplace(2);
+                    y.add_inplace(3);
+                    y.add_inplace(4);
+                    y.add_inplace(5);
+                    y.add_inplace(6);
+                    y.add_inplace(7);
 
                     assert!(x.contains_all(y));
                 }
@@ -987,22 +1142,22 @@ macro_rules! bitset {
                     let y = $name::singleton(0);
                     assert!(!x.contains_all(y));
 
-                    let y = $name::singleton(10);
+                    let y = $name::singleton(2);
                     assert!(!x.contains_all(y));
 
-                    let y = $name::singleton(100);
+                    let y = $name::singleton(3);
                     assert!(!x.contains_all(y));
 
-                    let y = $name::singleton(127);
+                    let y = $name::singleton(4);
                     assert!(!x.contains_all(y));
 
-                    let y = $name::singleton(128);
+                    let y = $name::singleton(5);
                     assert!(!x.contains_all(y));
 
-                    let y = $name::singleton(234);
+                    let y = $name::singleton(6);
                     assert!(!x.contains_all(y));
 
-                    let y = $name::singleton(255);
+                    let y = $name::singleton(7);
                     assert!(!x.contains_all(y));
                 }
 
@@ -1010,13 +1165,9 @@ macro_rules! bitset {
                 fn emptyset_contains_all() {
                     let x = $name::empty();
                     let mut y = $name::singleton(0);
-                    y.add_inplace(10);
-                    y.add_inplace(20);
-                    y.add_inplace(100);
-                    y.add_inplace(127);
-                    y.add_inplace(128);
-                    y.add_inplace(234);
-                    y.add_inplace(255);
+                    y.add_inplace(1);
+                    y.add_inplace(2);
+                    y.add_inplace(7);
 
                     assert!(!x.contains_all(y));
                 }
@@ -1024,13 +1175,10 @@ macro_rules! bitset {
                 #[test]
                 fn contains_all_empty() {
                     let mut x = $name::empty();
-                    x.add_inplace(10);
-                    x.add_inplace(20);
-                    x.add_inplace(100);
-                    x.add_inplace(127);
-                    x.add_inplace(128);
-                    x.add_inplace(234);
-                    x.add_inplace(255);
+                    x.add_inplace(1);
+                    x.add_inplace(2);
+                    x.add_inplace(3);
+                    x.add_inplace(7);
 
                     let y = $name::empty();
                     assert!(x.contains_all(y));
@@ -1038,13 +1186,10 @@ macro_rules! bitset {
                 #[test]
                 fn contains_all_fullset() {
                     let mut x = $name::empty();
-                    x.add_inplace(10);
-                    x.add_inplace(20);
-                    x.add_inplace(100);
-                    x.add_inplace(127);
-                    x.add_inplace(128);
-                    x.add_inplace(234);
-                    x.add_inplace(255);
+                    x.add_inplace(2);
+                    x.add_inplace(3);
+                    x.add_inplace(4);
+                    x.add_inplace(7);
 
                     let y = $name::full();
                     assert!(!x.contains_all(y));
@@ -1052,74 +1197,60 @@ macro_rules! bitset {
                 #[test]
                 fn contains_all_singleton() {
                     let mut x = $name::empty();
-                    x.add_inplace(10);
-                    x.add_inplace(20);
-                    x.add_inplace(100);
-                    x.add_inplace(127);
-                    x.add_inplace(128);
-                    x.add_inplace(234);
-                    x.add_inplace(255);
-
+                    x.add_inplace(1);
+                    x.add_inplace(2);
+                    x.add_inplace(3);
+                    x.add_inplace(4);
                     
                     let y = $name::singleton(0);
                     assert!(!x.contains_all(y));
 
-                    let y = $name::singleton(10);
+                    let y = $name::singleton(1);
                     assert!(x.contains_all(y));
 
-                    let y = $name::singleton(100);
+                    let y = $name::singleton(2);
                     assert!(x.contains_all(y));
 
-                    let y = $name::singleton(127);
+                    let y = $name::singleton(3);
                     assert!(x.contains_all(y));
 
-                    let y = $name::singleton(128);
-                    assert!(x.contains_all(y));
-
-                    let y = $name::singleton(234);
-                    assert!(x.contains_all(y));
-
-                    let y = $name::singleton(255);
+                    let y = $name::singleton(4);
                     assert!(x.contains_all(y));
                 }
 
                 #[test]
                 fn contains_all() {
                     let mut x = $name::empty();
-                    x.add_inplace(10);
-                    x.add_inplace(20);
-                    x.add_inplace(100);
-                    x.add_inplace(127);
-                    x.add_inplace(128);
-                    x.add_inplace(234);
-                    x.add_inplace(255);
+                    x.add_inplace(1);
+                    x.add_inplace(2);
+                    x.add_inplace(3);
+                    x.add_inplace(4);
+                    x.add_inplace(7);
 
                     let mut y = $name::empty();
-                    y.add_inplace(10);
-                    y.add_inplace(20);
-                    y.add_inplace(100);
-                    y.add_inplace(127);
-                    y.add_inplace(128);
-                    y.add_inplace(234);
-                    y.add_inplace(255);
+                    y.add_inplace(1);
+                    y.add_inplace(2);
+                    y.add_inplace(3);
+                    y.add_inplace(4);
+                    y.add_inplace(5);
+                    y.add_inplace(6);
+                    y.add_inplace(7);
 
-                    assert!(x.contains_all(y));
+                    assert!(y.contains_all(x));
                 }
                 #[test]
                 fn contains_all_partial_overlap() {
                     let mut x = $name::empty();
-                    x.add_inplace(10);
-                    x.add_inplace(20);
-                    x.add_inplace(255);
+                    x.add_inplace(1);
+                    x.add_inplace(2);
+                    x.add_inplace(4);
 
                     let mut y = $name::singleton(0);
-                    y.add_inplace(10);
-                    y.add_inplace(20);
-                    y.add_inplace(100);
-                    y.add_inplace(127);
-                    y.add_inplace(128);
-                    y.add_inplace(234);
-                    y.add_inplace(255);
+                    y.add_inplace(1);
+                    y.add_inplace(2);
+                    y.add_inplace(3);
+                    y.add_inplace(4);
+                    y.add_inplace(5);
 
                     assert!(!x.contains_all(y));
                 }
@@ -1138,22 +1269,22 @@ macro_rules! bitset {
                 }
                 #[test]
                 fn set_disjoint_from_complement() {
-                    let x = $name::singleton(10);
+                    let x = $name::singleton(4);
                     let mut y = x;
                     y.flip_inplace();
                     assert!(x.disjoint(y));
                 }
                 #[test]
                 fn disjoint_if_disjoint() {
-                    let x = $name::singleton(10);
-                    let y = $name::singleton(254);
+                    let x = $name::singleton(3);
+                    let y = $name::singleton(4);
                     assert!(x.disjoint(y));
                 }
                 #[test]
                 fn not_disjoint_if_partial_overlap() {
-                    let mut x = $name::singleton(10);
+                    let mut x = $name::singleton(3);
                     x.add_inplace(0);
-                    let mut y = $name::singleton(254);
+                    let mut y = $name::singleton(4);
                     y.add_inplace(0);
                     assert!(!x.disjoint(y));
                 }
@@ -1172,28 +1303,28 @@ macro_rules! bitset {
                 }
                 #[test]
                 fn set_does_not_intersect_complement() {
-                    let x = $name::singleton(10);
+                    let x = $name::singleton(4);
                     let mut y = x;
                     y.flip_inplace();
                     assert!(!x.intersects(y));
                 }
                 #[test]
                 fn do_not_intersect_if_disjoint() {
-                    let x = $name::singleton(10);
-                    let y = $name::singleton(254);
+                    let x = $name::singleton(3);
+                    let y = $name::singleton(4);
                     assert!(!x.intersects(y));
                 }
                 #[test]
                 fn intersect_if_partial_overlap() {
-                    let mut x = $name::singleton(10);
+                    let mut x = $name::singleton(3);
                     x.add_inplace(0);
-                    let mut y = $name::singleton(254);
+                    let mut y = $name::singleton(4);
                     y.add_inplace(0);
                     assert!(x.intersects(y));
                 }
                 #[test]
                 fn intersect_self() {
-                    let x = $name::singleton(10);
+                    let x = $name::singleton(6);
                     assert!(x.intersects(x));
                 }
 
@@ -1210,12 +1341,9 @@ macro_rules! bitset {
                 }
                 #[test]
                 fn almost_all_zeroes_in_sinleton() {
-                    let x = $name::singleton(129);
+                    let x = $name::singleton(6);
                     assert_eq!(x.capacity()-1, x.zeroes().count());
                 }
-
-                // TODO inc
-                // TODO inc_inplace
 
                 // --- DISPLAY -----------------------
                 #[test]
@@ -1238,153 +1366,9 @@ macro_rules! bitset {
     };
 }
 
-/// This structure is really only meant to facilitate the writing
-/// of iterator methods on bitsets. This way, only the const param
-/// can be specified while leaving all the other types inferred by 
-/// the compiler. (That's kind of type curry-ing).
-#[derive(Debug, Clone, Copy)]
-pub struct BitsBuilder<const BITS: u32>;
-impl <const BITS: u32> BitsBuilder<BITS> {
-    /// Creates a new iterator over the bits of the given blocks
-    pub fn build<T, I>(iter: I) -> Bits<BITS, T, I> 
-    where T: PrimInt + Unsigned + Shl + ShlAssign, 
-          I: Iterator<Item = T>
-    {
-        Bits::new(iter)
-    }
-}
-
-/// This iterator goes over all the bits whose value are 1 in a biset
-#[derive(Debug, Clone)]
-pub struct Bits<const BITS: u32, T, I> 
-where T: PrimInt + Unsigned + Shl + ShlAssign, 
-      I: Iterator<Item = T>
-{
-    /// The current block
-    head: Option<T>,
-    /// The rest of the blocks that haven't been touched yet
-    tail: I,
-    /// The portion of the value of the next item dependent 
-    /// of the position of the current block
-    base: u32,
-    /// The offset of the next tested item in its block
-    offset : u32, 
-    /// The number of items that remain to cover in the current block
-    /// 
-    /// # Note
-    /// This seemed like a smart thing to do since the LLVM assembly
-    /// has a decicated primitive 'ctpop' whose sole purpose is to 
-    /// count the on bits in an integer value.
-    rem : u32,
-    /// A mask that targets the test of the next bit in the current block
-    mask: T,
-}
-impl <const BITS: u32, T, I> Bits<BITS, T, I>
-where T: PrimInt + Unsigned + Shl + ShlAssign, 
-      I: Iterator<Item = T>
-{
-    /// Create a new iterator on the bits present in the integer blocks
-    /// that are iterated over by 'it'.
-    pub fn new(mut it: I) -> Self {
-        let head = it.next();
-        let tail = it;
-        let mask = T::one();
-        let base = 0;
-        let offset = 0;
-        let rem = if let Some(x) = head { x.count_ones() } else { 0 };
-
-        Self { head, tail, base, offset, rem, mask }
-    }
-}
-impl <const BITS: u32, T, I> Iterator for Bits<BITS, T, I>
-where T: PrimInt + Unsigned + Shl + ShlAssign, 
-      I: Iterator<Item = T>
-{
-    type Item = usize;
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let (_, tail_ub) = self.tail.size_hint();
-        let lb = self.rem as usize;
-        let ub = tail_ub.map(|x| x * BITS as usize + lb);
-
-        (lb, ub)
-    }
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while self.head.is_some() {
-            if self.rem == 0 {
-                self.head   = self.tail.next();
-                self.mask   = T::one();
-                self.base  += BITS;
-                self.offset = 0;
-                self.rem    = if let Some(x) = self.head { x.count_ones() } else { 0 }; 
-            } else {
-                break;
-            }
-        }
-        //
-        if let Some(x) = self.head {
-            // we can be sure that x is a non empty block
-            while (x & self.mask).is_zero() {
-                self.offset += 1;
-                self.mask  <<= T::one();
-            }
-            
-            // this is the result of our computation
-            let result = self.base + self.offset;
-            
-            // move to next bit
-            self.rem -= 1;
-            self.offset += 1;
-            self.mask  <<= T::one();
-            
-            Some(result as usize)
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-/// This is an iterator that will iterate over all the subsets of a given size
-/// of a given bitset
-pub struct SubsetsOfSize<T> {
-    /// the current value of the bitset considered as a large integer
-    pub current: T,
-    /// the size of the subsets we want to enumerate
-    pub of_size: usize,
-    /// the number of subsets we have counted already
-    pub counted: usize,
-    /// the maximum number of such sets that can be generated
-    pub max_count: usize,
-    /// a mapping between the original values and those in the smaller subset which
-    /// is being used to generate values during iteration
-    pub mapping: Vec<usize>
-}
-
-/// This will count the number of possible cases. Given that we want to 
-/// draw k items among a set of n, without considering the repetitions
-/// and without considerations for the order, we are computing the number
-/// of possible combinations $C^n_k = \frac{n!}{k! (n-k)!}$. 
-pub fn nb_combinations(k: usize, among_n: usize) -> usize {
-    if k == among_n { 
-        1 
-    } else {
-        let mut num  = 1;
-        let mut denom = 1;
-
-        for i in 1..=k {
-            denom *= i;
-            num   *= among_n - (i - 1);
-        }
-
-        num / denom
-    }
-}
-
-bitset!(Set8, 8, 8, u8);
-bitset!(Set16, 16, 16, u16);
-bitset!(Set32, 32, 32, u32);
-bitset!(Set64, 64, 64, u64);
-bitset!(Set128, 128, 128, u128);
-bitset!(Set256, 256, 128, u128);
+test!(Set8,     8);
+test!(Set16,   16);
+test!(Set32,   32);
+test!(Set64,   64);
+test!(Set128, 128);
+test!(Set256, 256);
