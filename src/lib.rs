@@ -8,7 +8,7 @@ macro_rules! bitset {
         /// This structure implemts a bitset with a maximum capacity of 
         /// $capa bits. The structure requires no dynamic allocation and it is
         /// therefore fully copiable
-        #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+        #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
         pub struct $name {
             /// the datablocks
             blocks: [$block_type; Self::nb_blocks($capa, $block_size)]
