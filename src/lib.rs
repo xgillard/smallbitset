@@ -1,6 +1,6 @@
 use std::{ops::{Shl, ShlAssign}, fmt::Debug};
 
-use num::{PrimInt, Unsigned};
+use num_traits::{PrimInt, Unsigned};
 
 #[macro_export]
 macro_rules! bitset {
@@ -496,8 +496,8 @@ bitset!(Set256, 256, 128, u128);
 
 macro_rules! test {
     ($name: ident, $capa: expr) => {
+        #[cfg(test)]
         paste::paste! {
-            #[cfg(test)]
             mod [<test_ $name:snake:lower>] {
                 use super::*;
 
@@ -1365,6 +1365,17 @@ macro_rules! test {
         }
     };
 }
+
+//#[cfg(test)]
+//mod tests{
+//    use super::*;
+//    test!(Set8,     8);
+//    test!(Set16,   16);
+//    test!(Set32,   32);
+//    test!(Set64,   64);
+//    test!(Set128, 128);
+//    test!(Set256, 256);
+//}
 
 test!(Set8,     8);
 test!(Set16,   16);
