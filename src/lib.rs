@@ -1,4 +1,9 @@
-use std::{ops::{Shl, ShlAssign}, fmt::Debug};
+#![no_std]
+
+#[cfg(any(test, feature = "alloc"))]
+extern crate alloc;
+
+use core::{ops::{Shl, ShlAssign}, fmt::Debug};
 
 use num_traits::{PrimInt, Unsigned};
 
@@ -179,6 +184,8 @@ macro_rules! bitset {
                 $crate::BitsBuilder::<$block_size>::build(iter)
             }
             /// Returns an iterator that goes over all the items absent from this set
+            /// Requires the `alloc` feature
+            #[cfg(feature = "alloc")]
             pub fn subsets(&self, of_size: usize) -> impl Iterator<Item = Self> + '_ {
                 let iter = self.ones();
                 $crate::SubsetsOfSize::<$name>::new(of_size, iter)
@@ -223,8 +230,8 @@ macro_rules! bitset {
             }
         }
 
-        impl std::fmt::Display for $name {
-            fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        impl core::fmt::Display for $name {
+            fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
                 write!(fmt, "{{")?;
                 let mut first = true;
                 
@@ -247,43 +254,43 @@ macro_rules! bitset {
             }
         }
 
-        impl std::ops::BitAnd for $name {
+        impl core::ops::BitAnd for $name {
             type Output = Self;
 
             fn bitand(self, rhs: Self) -> Self::Output {
                 self.inter(rhs)
             }
         }
-        impl std::ops::BitAndAssign for $name {
+        impl core::ops::BitAndAssign for $name {
             fn bitand_assign(&mut self, rhs: Self) {
                 self.inter_inplace(&rhs);
             }
         }
-        impl std::ops::BitOr for $name {
+        impl core::ops::BitOr for $name {
             type Output = Self;
 
             fn bitor(self, rhs: Self) -> Self::Output {
                 self.union(rhs)
             }
         }
-        impl std::ops::BitOrAssign for $name {
+        impl core::ops::BitOrAssign for $name {
             fn bitor_assign(&mut self, rhs: Self) {
                 self.union_inplace(&rhs);
             }
         }
-        impl std::ops::BitXor for $name {
+        impl core::ops::BitXor for $name {
             type Output = Self;
 
             fn bitxor(self, rhs: Self) -> Self::Output {
                 self.symmetric_difference(rhs)
             }
         }
-        impl std::ops::BitXorAssign for $name {
+        impl core::ops::BitXorAssign for $name {
             fn bitxor_assign(&mut self, rhs: Self) {
                 self.symmetric_difference_inplace(&rhs);
             }
         }
-        impl std::ops::Not for $name {
+        impl core::ops::Not for $name {
             type Output = Self;
 
             fn not(self) -> Self::Output {
@@ -291,6 +298,7 @@ macro_rules! bitset {
             }
         }
 
+        #[cfg(feature = "alloc")]
         impl $crate::SubsetsOfSize<$name> {
             /// This function is used to remap a smaller bitset (one that only account
             /// for the lowest possible set of values only) onto the set of values that
@@ -303,11 +311,12 @@ macro_rules! bitset {
                 out
             }
         }
-        
+
+        #[cfg(feature = "alloc")]
         impl $crate::SubsetsOfSize<$name> {
             /// Creates a new instance
             pub fn new(k: usize, among: impl Iterator<Item = usize>) -> Self {
-                let mapping = among.collect::<Vec<_>>();
+                let mapping = among.collect::<alloc::vec::Vec<_>>();
                 let combinations = $crate::nb_combinations(k, mapping.len());
                 
                 let mut current = $name::default();
@@ -325,6 +334,7 @@ macro_rules! bitset {
             }
         }
 
+        #[cfg(feature = "alloc")]
         impl Iterator for $crate::SubsetsOfSize<$name> {
             type Item = $name;
 
@@ -450,6 +460,7 @@ where T: PrimInt + Unsigned + Shl + ShlAssign,
     }
 }
 
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 /// This is an iterator that will iterate over all the subsets of a given size
 /// of a given bitset
@@ -464,7 +475,7 @@ pub struct SubsetsOfSize<T> {
     pub max_count: usize,
     /// a mapping between the original values and those in the smaller subset which
     /// is being used to generate values during iteration
-    pub mapping: Vec<usize>
+    pub mapping: alloc::vec::Vec<usize>
 }
 
 /// This will count the number of possible cases. Given that we want to 
@@ -500,6 +511,7 @@ macro_rules! test {
         paste::paste! {
             mod [<test_ $name:snake:lower>] {
                 use super::*;
+                use alloc::{vec, format, vec::Vec};
 
                 #[test]
                 fn default_is_emptyset() {
@@ -1025,6 +1037,7 @@ macro_rules! test {
                 }
 
                 #[test]
+                #[cfg(feature = "alloc")]
                 fn test_subsets_small() {
                     let x = $name::singleton(1).add(2).add(3).add(4).add(5);
                     let v = x.subsets(3).collect::<Vec<_>>();
@@ -1044,6 +1057,7 @@ macro_rules! test {
                     assert_eq!(r, v);
                 }
                 #[test]
+                #[cfg(feature = "alloc")]
                 fn test_subsets_zero() {
                     let x = $name::singleton(1).add(2).add(3).add(4).add(5);
                     let v = x.subsets(0).collect::<Vec<_>>();
@@ -1055,6 +1069,7 @@ macro_rules! test {
                     assert_eq!(r, v);
                 }
                 #[test]
+                #[cfg(feature = "alloc")]
                 fn test_subsets_full() {
                     let x = $name::full();
                     let v = x.subsets($capa).collect::<Vec<_>>();
@@ -1365,17 +1380,6 @@ macro_rules! test {
         }
     };
 }
-
-//#[cfg(test)]
-//mod tests{
-//    use super::*;
-//    test!(Set8,     8);
-//    test!(Set16,   16);
-//    test!(Set32,   32);
-//    test!(Set64,   64);
-//    test!(Set128, 128);
-//    test!(Set256, 256);
-//}
 
 test!(Set8,     8);
 test!(Set16,   16);
