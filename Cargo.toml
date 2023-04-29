@@ -11,6 +11,12 @@ keywords    = ["bitset", "small-values", "allocation-free"]
 categories  = ["data-structures", "mathematics"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+alloc = []
+default = ["alloc"]
+
 [dependencies]
-num   = "0.4"
+num-traits = { version = "0.2", default-features = false }
+
+[dev-dependencies]
 paste = "1.0"
