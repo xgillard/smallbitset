@@ -497,6 +497,36 @@ pub fn nb_combinations(k: usize, among_n: usize) -> usize {
         num / denom
     }
 }
+#[macro_export]
+macro_rules! conversion {
+    ($settype: ident, $blocks: ty) => {
+        impl From<$settype> for $blocks {
+            fn from(x: $settype) -> $blocks {
+                x.blocks
+            }
+        }
+        impl From<$blocks> for $settype {
+            fn from(x: $blocks) -> $settype {
+                $settype{blocks: x}
+            }
+        }
+    }
+}
+#[macro_export]
+macro_rules! primitive {
+    ($settype: ident, $primitive: ty) => {
+        impl From<$settype> for $primitive {
+            fn from(x: $settype) -> $primitive {
+                x.blocks[0]
+            }
+        }
+        impl From<$primitive> for $settype {
+            fn from(x: $primitive) -> $settype {
+                $settype{blocks: [x]}
+            }
+        }
+    }
+}
 
 bitset!(Set8,     8,   8, u8);
 bitset!(Set16,   16,  16, u16);
@@ -504,6 +534,19 @@ bitset!(Set32,   32,  32, u32);
 bitset!(Set64,   64,  64, u64);
 bitset!(Set128, 128, 128, u128);
 bitset!(Set256, 256, 128, u128);
+
+primitive!(Set8,   u8);
+primitive!(Set16,  u16);
+primitive!(Set32,  u32);
+primitive!(Set64,  u64);
+primitive!(Set128, u128);
+
+conversion!(Set8,   [u8;1]);
+conversion!(Set16,  [u16;1]);
+conversion!(Set32,  [u32;1]);
+conversion!(Set64,  [u64;1]);
+conversion!(Set128, [u128;1]);
+conversion!(Set256, [u128;2]);
 
 macro_rules! test {
     ($name: ident, $capa: expr) => {
