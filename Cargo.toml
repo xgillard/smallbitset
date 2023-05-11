@@ -1,6 +1,6 @@
 [package]
 name        = "smallbitset"
-version     = "0.6.1"
+version     = "0.7.0"
 authors     = ["Xavier Gillard <xavier.gillard@uclouvain.be>"]
 edition     = "2018"
 description = "This crate provides a series of allocation free sets capable of holding small integer values."
